@@ -1,59 +1,59 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-
+ 
 // ─── Persistent storage (survives refresh) ───────────────────────
 const STORAGE_KEY = "nepal_plans_data";
 const USERS_KEY = "nepal_plans_users";
 const SESSION_KEY = "nepal_plans_session";
-
+ 
 const defaultUsers = [
   { id: "u1", name: "You", emoji: "🧡", color: "#c4785a" },
   { id: "u2", name: "Her", emoji: "💛", color: "#7a9e8e" },
 ];
-
+ 
 function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
-
+ 
 function saveData(items) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
-
+ 
 function loadUsers() {
   try {
     const raw = localStorage.getItem(USERS_KEY);
     return raw ? JSON.parse(raw) : defaultUsers;
   } catch { return defaultUsers; }
 }
-
+ 
 function saveUsers(users) {
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
-
+ 
 function loadSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
-
+ 
 function saveSession(uid) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
 }
-
+ 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
-
+ 
 // ─── Icons ────────────────────────────────────────────────────────
 const CheckIcon = () => (
   <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
     <path d="M1 4.5L4 7.5L10 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
-
+ 
 const DragIcon = () => (
   <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" opacity="0.4">
     <circle cx="3.5" cy="2.5" r="1.1"/><circle cx="8.5" cy="2.5" r="1.1"/>
@@ -61,31 +61,31 @@ const DragIcon = () => (
     <circle cx="3.5" cy="9.5" r="1.1"/><circle cx="8.5" cy="9.5" r="1.1"/>
   </svg>
 );
-
+ 
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
   </svg>
 );
-
+ 
 const EditIcon = () => (
   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
     <path d="M9.5 1.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
   </svg>
 );
-
+ 
 const TrashIcon = () => (
   <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
     <path d="M2 3.5h9M5 3.5V2.5h3v1M4 3.5l.5 7h4l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
-
+ 
 // ─── Styles ───────────────────────────────────────────────────────
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap');
-
+ 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
+ 
   :root {
     --cream: #faf6ef;
     --parchment: #f2ead8;
@@ -105,7 +105,7 @@ const globalStyles = `
     --font-b: 'Outfit', sans-serif;
     --ease: cubic-bezier(0.34,1.2,0.64,1);
   }
-
+ 
   body {
     background: var(--cream);
     font-family: var(--font-b);
@@ -113,11 +113,11 @@ const globalStyles = `
     -webkit-font-smoothing: antialiased;
     min-height: 100vh;
   }
-
+ 
   button { font-family: var(--font-b); cursor: pointer; border: none; background: none; }
   input, textarea { font-family: var(--font-b); }
   textarea { resize: none; }
-
+ 
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
@@ -144,7 +144,7 @@ const globalStyles = `
   @keyframes progressFill {
     from { width: 0%; }
   }
-
+ 
   .app-wrap {
     min-height: 100vh;
     background:
@@ -152,7 +152,7 @@ const globalStyles = `
       radial-gradient(ellipse 50% 50% at 95% 5%, rgba(122,158,142,0.10) 0%, transparent 60%),
       var(--cream);
   }
-
+ 
   /* ── Login ── */
   .login-wrap {
     min-height: 100vh;
@@ -276,7 +276,7 @@ const globalStyles = `
     justify-content: center;
     gap: 5px;
   }
-
+ 
   /* ── Header ── */
   .header {
     background: var(--white);
@@ -339,7 +339,7 @@ const globalStyles = `
     margin-top: 1px;
     letter-spacing: 0.06em;
   }
-
+ 
   /* ── Progress ── */
   .progress-card {
     background: var(--white);
@@ -369,7 +369,7 @@ const globalStyles = `
     text-align: center;
     margin-top: 9px;
   }
-
+ 
   /* ── Plan Items ── */
   .section-label {
     font-size: 0.68rem;
@@ -381,7 +381,7 @@ const globalStyles = `
     padding-left: 2px;
   }
   .items-list { display: flex; flex-direction: column; gap: 7px; }
-
+ 
   .plan-item {
     background: var(--white);
     border-radius: var(--r);
@@ -403,7 +403,7 @@ const globalStyles = `
     border-color: var(--terracotta);
     opacity: 0.85;
   }
-
+ 
   .drag-handle-btn {
     color: var(--ink-30);
     cursor: grab;
@@ -415,7 +415,7 @@ const globalStyles = `
   }
   .plan-item:hover .drag-handle-btn { opacity: 1; }
   .drag-handle-btn:active { cursor: grabbing; }
-
+ 
   .cb-btn {
     width: 20px; height: 20px;
     border-radius: 6px;
@@ -429,7 +429,7 @@ const globalStyles = `
   .cb-btn:hover { border-color: var(--terracotta); }
   .cb-btn.checked { background: var(--sage); border-color: var(--sage); }
   .cb-btn.checked:hover { background: var(--forest); border-color: var(--forest); }
-
+ 
   .item-body { flex: 1; min-width: 0; }
   .item-title-text {
     font-size: 0.9rem;
@@ -452,7 +452,7 @@ const globalStyles = `
     color: var(--ink-30);
     margin-top: 4px;
   }
-
+ 
   .item-actions {
     display: flex;
     gap: 2px;
@@ -470,7 +470,7 @@ const globalStyles = `
   }
   .item-action-btn:hover { background: var(--parchment); color: var(--ink); }
   .item-action-btn.danger:hover { background: #fef0ee; color: #c04030; }
-
+ 
   /* Edit form inside item */
   .item-edit { flex: 1; display: flex; flex-direction: column; gap: 7px; }
   .item-edit-title {
@@ -515,7 +515,7 @@ const globalStyles = `
     transition: background 0.18s;
   }
   .btn-ghost:hover { background: var(--sand); }
-
+ 
   /* ── Add Form ── */
   .add-trigger-btn {
     width: 100%;
@@ -589,7 +589,7 @@ const globalStyles = `
   .btn-add-submit:hover { background: var(--rust); }
   .btn-add-submit:active { transform: scale(0.98); }
   .btn-add-submit:disabled { opacity: 0.45; pointer-events: none; }
-
+ 
   /* ── Empty ── */
   .empty-wrap {
     text-align: center;
@@ -610,7 +610,7 @@ const globalStyles = `
     color: var(--ink-60);
     line-height: 1.6;
   }
-
+ 
   /* ── Done section ── */
   .done-section { margin-top: 16px; }
   .done-toggle-btn {
@@ -626,7 +626,7 @@ const globalStyles = `
     gap: 5px;
   }
   .done-toggle-btn:hover { color: var(--forest); }
-
+ 
   /* ── Settings overlay ── */
   .settings-overlay {
     position: fixed; inset: 0; z-index: 100;
@@ -685,16 +685,16 @@ const globalStyles = `
     margin-top: 6px;
   }
   .settings-save-btn:hover { background: var(--rust); }
-
+ 
   /* ── Main layout ── */
   .main-wrap { max-width: 580px; margin: 0 auto; padding: 20px 16px 80px; }
   .section { display: flex; flex-direction: column; gap: 7px; margin-bottom: 20px; }
-
+ 
   @media (min-width: 580px) {
     .main-wrap { padding: 24px 20px 80px; }
     .header { border-radius: 0; }
   }
-
+ 
   .confetti-dot {
     position: fixed;
     width: 7px; height: 7px;
@@ -708,7 +708,7 @@ const globalStyles = `
     to   { opacity: 0; transform: translateY(120px) rotate(360deg); }
   }
 `;
-
+ 
 // ─── Confetti burst ───────────────────────────────────────────────
 function spawnConfetti(x, y) {
   const colors = ["#c4785a","#7a9e8e","#e5d9c4","#f2c96a","#d4a5a5"];
@@ -725,13 +725,13 @@ function spawnConfetti(x, y) {
     setTimeout(() => el.remove(), 1400);
   }
 }
-
+ 
 // ─── Login Screen ─────────────────────────────────────────────────
 function LoginScreen({ users, onLogin }) {
   const [selected, setSelected] = useState(null);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
+ 
   const handleLogin = () => {
     if (!selected) return;
     if (password !== "nepal2025") {
@@ -740,14 +740,14 @@ function LoginScreen({ users, onLogin }) {
     }
     onLogin(selected);
   };
-
+ 
   return (
     <div className="login-wrap">
       <div className="login-card">
         <span className="login-mountain">🏔️</span>
         <h1 className="login-title">Our Nepal Plan</h1>
         <p className="login-sub">A private space, just for the two of you.</p>
-
+ 
         <span className="user-select-label">Who's logging in?</span>
         <div className="user-buttons">
           {users.map(u => (
@@ -761,7 +761,7 @@ function LoginScreen({ users, onLogin }) {
             </button>
           ))}
         </div>
-
+ 
         {selected && (
           <div className="pw-field">
             <label className="pw-label">Password</label>
@@ -777,9 +777,9 @@ function LoginScreen({ users, onLogin }) {
             <p className="pw-hint">Default password is: nepal2025</p>
           </div>
         )}
-
+ 
         {error && <div className="login-error">{error}</div>}
-
+ 
         <button
           className="login-btn"
           onClick={handleLogin}
@@ -792,13 +792,13 @@ function LoginScreen({ users, onLogin }) {
     </div>
   );
 }
-
+ 
 // ─── Progress Bar ─────────────────────────────────────────────────
 function ProgressBar({ items }) {
   const total = items.length;
   const done  = items.filter(i => i.done).length;
   const pct   = total === 0 ? 0 : Math.round((done/total)*100);
-
+ 
   const msgs = [
     "Your adventure is a blank canvas ✨",
     "The journey begins, one plan at a time…",
@@ -808,7 +808,7 @@ function ProgressBar({ items }) {
     "Every plan ticked. Every memory, yours. 🇳🇵❤️",
   ];
   const msgIdx = total === 0 ? 0 : Math.min(Math.floor(pct/20), 5);
-
+ 
   return (
     <div className="progress-card">
       <div className="prog-row">
@@ -822,38 +822,38 @@ function ProgressBar({ items }) {
     </div>
   );
 }
-
+ 
 // ─── Single Plan Item ─────────────────────────────────────────────
 function PlanItem({ item, users, onToggle, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [desc,  setDesc]  = useState(item.description || "");
   const [confirmDel, setConfirmDel] = useState(false);
-
+ 
   const addedBy = users.find(u => u.id === item.addedById);
-
+ 
   const handleSave = () => {
     if (!title.trim()) return;
     onUpdate(item.id, { title: title.trim(), description: desc.trim() });
     setEditing(false);
   };
-
+ 
   const handleDelete = () => {
     if (!confirmDel) { setConfirmDel(true); setTimeout(() => setConfirmDel(false), 3000); return; }
     onDelete(item.id);
   };
-
+ 
   const handleToggle = (e) => {
     if (!item.done) spawnConfetti(e.clientX, e.clientY);
     onToggle(item.id);
   };
-
+ 
   return (
     <div className={`plan-item ${item.done ? "is-done" : ""}`}>
       <button className="drag-handle-btn" title="Drag to reorder">
         <DragIcon />
       </button>
-
+ 
       <button
         className={`cb-btn ${item.done ? "checked" : ""}`}
         onClick={handleToggle}
@@ -861,7 +861,7 @@ function PlanItem({ item, users, onToggle, onUpdate, onDelete }) {
       >
         {item.done && <CheckIcon />}
       </button>
-
+ 
       {editing ? (
         <div className="item-edit">
           <input
@@ -893,7 +893,7 @@ function PlanItem({ item, users, onToggle, onUpdate, onDelete }) {
           {addedBy && <p className="item-by">Added by {addedBy.name}</p>}
         </div>
       )}
-
+ 
       {!editing && (
         <div className="item-actions">
           <button className="item-action-btn" onClick={() => setEditing(true)} title="Edit"><EditIcon /></button>
@@ -910,26 +910,26 @@ function PlanItem({ item, users, onToggle, onUpdate, onDelete }) {
     </div>
   );
 }
-
+ 
 // ─── Add Item Form ────────────────────────────────────────────────
 function AddForm({ currentUser, onAdd }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [desc, setDesc]   = useState("");
-
+ 
   const handleSubmit = () => {
     if (!title.trim()) return;
     onAdd({ title: title.trim(), description: desc.trim(), addedById: currentUser.id });
     setTitle(""); setDesc(""); setOpen(false);
   };
-
+ 
   if (!open) return (
     <button className="add-trigger-btn" onClick={() => setOpen(true)}>
       <span className="add-trigger-icon"><PlusIcon /></span>
       Add something to our list…
     </button>
   );
-
+ 
   return (
     <div className="add-form-card">
       <p className="add-form-title">New plan item</p>
@@ -962,7 +962,7 @@ function AddForm({ currentUser, onAdd }) {
     </div>
   );
 }
-
+ 
 // ─── Settings Sheet ───────────────────────────────────────────────
 function SettingsSheet({ users, onSave, onClose }) {
   const [u1name, setU1name] = useState(users[0].name);
@@ -970,7 +970,7 @@ function SettingsSheet({ users, onSave, onClose }) {
   const [tagline, setTagline] = useState(
     localStorage.getItem("nepal_tagline") || "Counting days together…"
   );
-
+ 
   const handleSave = () => {
     const updated = [
       { ...users[0], name: u1name.trim() || users[0].name },
@@ -980,12 +980,12 @@ function SettingsSheet({ users, onSave, onClose }) {
     onSave(updated);
     onClose();
   };
-
+ 
   return (
     <div className="settings-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="settings-sheet">
         <h2 className="settings-title">Personalise ✏️</h2>
-
+ 
         <div className="settings-field">
           <label className="settings-label">Person 1 name {users[0].emoji}</label>
           <input className="settings-input" value={u1name} onChange={e => setU1name(e.target.value)} />
@@ -998,13 +998,13 @@ function SettingsSheet({ users, onSave, onClose }) {
           <label className="settings-label">Tagline</label>
           <input className="settings-input" value={tagline} onChange={e => setTagline(e.target.value)} />
         </div>
-
+ 
         <button className="settings-save-btn" onClick={handleSave}>Save changes</button>
       </div>
     </div>
   );
 }
-
+ 
 // ─── Main App ─────────────────────────────────────────────────────
 export default function App() {
   const [users, setUsers]         = useState(loadUsers);
@@ -1015,29 +1015,29 @@ export default function App() {
   const [tagline, setTagline]     = useState(
     () => localStorage.getItem("nepal_tagline") || "Counting days together…"
   );
-
+ 
   // Persist items whenever they change
   useEffect(() => { saveData(items); }, [items]);
-
+ 
   // Refresh tagline when settings change
   useEffect(() => {
     const t = localStorage.getItem("nepal_tagline") || "Counting days together…";
     setTagline(t);
   }, [showSettings]);
-
+ 
   const currentUser = session ? users.find(u => u.id === session) : null;
   const partnerUser = session ? users.find(u => u.id !== session) : null;
-
+ 
   const handleLogin = (user) => {
     setSession(user.id);
     saveSession(user.id);
   };
-
+ 
   const handleLogout = () => {
     setSession(null);
     clearSession();
   };
-
+ 
   const addItem = (data) => {
     const newItem = {
       id: `item_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
@@ -1048,23 +1048,23 @@ export default function App() {
     };
     setItems(prev => [...prev, newItem]);
   };
-
+ 
   const updateItem = (id, data) => {
     setItems(prev => prev.map(i => i.id === id ? { ...i, ...data } : i));
   };
-
+ 
   const toggleItem = (id) => {
     setItems(prev => prev.map(i => i.id === id ? { ...i, done: !i.done } : i));
   };
-
+ 
   const deleteItem = (id) => {
     setItems(prev => prev.filter(i => i.id !== id));
   };
-
+ 
   // Simple drag-and-drop (touch + mouse)
   const dragItem = useRef(null);
   const dragOverItem = useRef(null);
-
+ 
   const handleDragStart = (idx) => { dragItem.current = idx; };
   const handleDragEnter = (idx) => { dragOverItem.current = idx; };
   const handleDragEnd   = () => {
@@ -1078,13 +1078,13 @@ export default function App() {
     dragItem.current = null;
     dragOverItem.current = null;
   };
-
+ 
   const saveSettings = (updatedUsers) => {
     setUsers(updatedUsers);
     saveUsers(updatedUsers);
     setTagline(localStorage.getItem("nepal_tagline") || "Counting days together…");
   };
-
+ 
   if (!currentUser) {
     return (
       <>
@@ -1093,15 +1093,15 @@ export default function App() {
       </>
     );
   }
-
+ 
   const pending = items.filter(i => !i.done);
   const done    = items.filter(i =>  i.done);
-
+ 
   return (
     <>
       <style>{globalStyles}</style>
       <div className="app-wrap">
-
+ 
         {/* Header */}
         <header className="header">
           <div className="header-inner">
@@ -1128,15 +1128,15 @@ export default function App() {
             <p className="header-who">{currentUser.name} &amp; {partnerUser?.name || "Your person"}</p>
           </div>
         </header>
-
+ 
         {/* Main */}
         <main className="main-wrap">
-
+ 
           {/* Progress */}
           <div style={{ marginBottom: 20 }}>
             <ProgressBar items={items} />
           </div>
-
+ 
           {/* Pending items */}
           <div className="section">
             {pending.length > 0 && (
@@ -1162,7 +1162,7 @@ export default function App() {
                 </div>
               ))}
             </div>
-
+ 
             {items.length === 0 && (
               <div className="empty-wrap">
                 <span className="empty-icon">🗺️</span>
@@ -1171,10 +1171,10 @@ export default function App() {
               </div>
             )}
           </div>
-
+ 
           {/* Add form */}
           <AddForm currentUser={currentUser} onAdd={addItem} />
-
+ 
           {/* Done section */}
           {done.length > 0 && (
             <div className="done-section">
@@ -1201,7 +1201,7 @@ export default function App() {
             </div>
           )}
         </main>
-
+ 
         {/* Settings sheet */}
         {showSettings && (
           <SettingsSheet
