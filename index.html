@@ -1,1 +1,1216 @@
+import { useState, useEffect, useRef, useCallback } from "react";
 
+// ─── Persistent storage (survives refresh) ───────────────────────
+const STORAGE_KEY = "nepal_plans_data";
+const USERS_KEY = "nepal_plans_users";
+const SESSION_KEY = "nepal_plans_session";
+
+const defaultUsers = [
+  { id: "u1", name: "You", emoji: "🧡", color: "#c4785a" },
+  { id: "u2", name: "Her", emoji: "💛", color: "#7a9e8e" },
+];
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveData(items) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function loadUsers() {
+  try {
+    const raw = localStorage.getItem(USERS_KEY);
+    return raw ? JSON.parse(raw) : defaultUsers;
+  } catch { return defaultUsers; }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveSession(uid) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(uid));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+// ─── Icons ────────────────────────────────────────────────────────
+const CheckIcon = () => (
+  <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+    <path d="M1 4.5L4 7.5L10 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const DragIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" opacity="0.4">
+    <circle cx="3.5" cy="2.5" r="1.1"/><circle cx="8.5" cy="2.5" r="1.1"/>
+    <circle cx="3.5" cy="6" r="1.1"/><circle cx="8.5" cy="6" r="1.1"/>
+    <circle cx="3.5" cy="9.5" r="1.1"/><circle cx="8.5" cy="9.5" r="1.1"/>
+  </svg>
+);
+
+const PlusIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M8 2v12M2 8h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+    <path d="M9.5 1.5l2 2-7 7H2.5v-2l7-7z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+  </svg>
+);
+
+const TrashIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+    <path d="M2 3.5h9M5 3.5V2.5h3v1M4 3.5l.5 7h4l.5-7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+// ─── Styles ───────────────────────────────────────────────────────
+const globalStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream: #faf6ef;
+    --parchment: #f2ead8;
+    --sand: #e5d9c4;
+    --terracotta: #c4785a;
+    --rust: #9e5a3e;
+    --sage: #7a9e8e;
+    --forest: #4a7464;
+    --ink: #1e1410;
+    --ink-60: rgba(30,20,16,0.6);
+    --ink-30: rgba(30,20,16,0.3);
+    --ink-10: rgba(30,20,16,0.1);
+    --white: #ffffff;
+    --r: 16px;
+    --rs: 10px;
+    --font-d: 'Playfair Display', serif;
+    --font-b: 'Outfit', sans-serif;
+    --ease: cubic-bezier(0.34,1.2,0.64,1);
+  }
+
+  body {
+    background: var(--cream);
+    font-family: var(--font-b);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  button { font-family: var(--font-b); cursor: pointer; border: none; background: none; }
+  input, textarea { font-family: var(--font-b); }
+  textarea { resize: none; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes heartbeat {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.25); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes progressFill {
+    from { width: 0%; }
+  }
+
+  .app-wrap {
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 60% 40% at 5% 95%, rgba(196,120,90,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 95% 5%, rgba(122,158,142,0.10) 0%, transparent 60%),
+      var(--cream);
+  }
+
+  /* ── Login ── */
+  .login-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background:
+      radial-gradient(ellipse 70% 50% at 10% 90%, rgba(196,120,90,0.15) 0%, transparent 55%),
+      radial-gradient(ellipse 60% 60% at 90% 5%,  rgba(122,158,142,0.12) 0%, transparent 55%),
+      var(--cream);
+  }
+  .login-card {
+    width: 100%; max-width: 400px;
+    background: var(--white);
+    border-radius: 28px;
+    padding: 44px 40px;
+    box-shadow: 0 12px 60px rgba(30,20,16,0.10), 0 2px 8px rgba(30,20,16,0.06);
+    animation: scaleIn 0.45s var(--ease);
+    text-align: center;
+  }
+  .login-mountain { font-size: 3rem; margin-bottom: 6px; display: block; }
+  .login-title {
+    font-family: var(--font-d);
+    font-size: 2rem;
+    color: var(--ink);
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .login-sub {
+    font-size: 0.82rem;
+    color: var(--ink-60);
+    font-style: italic;
+    margin-bottom: 32px;
+    font-family: var(--font-d);
+  }
+  .user-select-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--ink-60);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+    display: block;
+    text-align: left;
+  }
+  .user-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .user-btn {
+    border: 2px solid var(--sand);
+    border-radius: var(--r);
+    padding: 16px 12px;
+    text-align: center;
+    transition: all 0.2s;
+    background: var(--parchment);
+  }
+  .user-btn:hover { border-color: var(--terracotta); background: #fdf6f0; transform: translateY(-1px); }
+  .user-btn.selected { border-color: var(--terracotta); background: #fdf6f0; box-shadow: 0 0 0 3px rgba(196,120,90,0.15); }
+  .user-btn-emoji { font-size: 1.6rem; display: block; margin-bottom: 4px; }
+  .user-btn-name { font-size: 0.875rem; font-weight: 500; color: var(--ink); display: block; }
+  .pw-field {
+    text-align: left;
+    margin-bottom: 16px;
+    animation: fadeUp 0.3s var(--ease);
+  }
+  .pw-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--ink-60);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: block;
+    margin-bottom: 6px;
+  }
+  .pw-input {
+    width: 100%;
+    border: 1.5px solid var(--sand);
+    border-radius: var(--rs);
+    padding: 11px 14px;
+    font-size: 0.9rem;
+    color: var(--ink);
+    background: var(--parchment);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .pw-input:focus { border-color: var(--terracotta); }
+  .pw-hint { font-size: 0.72rem; color: var(--ink-60); margin-top: 5px; font-style: italic; }
+  .login-btn {
+    width: 100%;
+    background: var(--terracotta);
+    color: white;
+    border-radius: var(--rs);
+    padding: 13px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: background 0.2s, transform 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .login-btn:hover { background: var(--rust); }
+  .login-btn:active { transform: scale(0.98); }
+  .login-btn:disabled { opacity: 0.5; pointer-events: none; }
+  .login-error {
+    background: #fef0ee;
+    border: 1px solid #f5c4ba;
+    color: #c04030;
+    border-radius: var(--rs);
+    padding: 9px 12px;
+    font-size: 0.8rem;
+    margin-bottom: 12px;
+  }
+  .login-privacy {
+    margin-top: 16px;
+    font-size: 0.72rem;
+    color: var(--ink-30);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--white);
+    border-bottom: 1px solid var(--sand);
+    padding: 18px 20px 16px;
+    position: sticky; top: 0; z-index: 20;
+    box-shadow: 0 1px 0 var(--sand), 0 4px 20px rgba(30,20,16,0.04);
+  }
+  .header-inner { max-width: 580px; margin: 0 auto; }
+  .header-row1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .avatars-row { display: flex; align-items: center; gap: 6px; }
+  .av {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 600;
+    letter-spacing: 0.02em;
+    box-shadow: 0 1px 4px rgba(30,20,16,0.12);
+    border: 2px solid var(--white);
+  }
+  .av-heart {
+    font-size: 0.95rem;
+    color: var(--terracotta);
+    animation: heartbeat 2.8s ease-in-out infinite;
+  }
+  .header-actions { display: flex; gap: 6px; }
+  .header-btn {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--parchment);
+    color: var(--ink-60);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem;
+    transition: background 0.2s, color 0.2s;
+  }
+  .header-btn:hover { background: var(--sand); color: var(--ink); }
+  .header-title-row { display: flex; align-items: baseline; gap: 8px; }
+  .header-title {
+    font-family: var(--font-d);
+    font-size: 1.75rem;
+    color: var(--ink);
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+  .header-flag { font-size: 1.3rem; }
+  .header-tagline {
+    font-family: var(--font-d);
+    font-style: italic;
+    font-size: 0.85rem;
+    color: var(--ink-60);
+    margin-top: 2px;
+  }
+  .header-who {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--terracotta);
+    margin-top: 1px;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── Progress ── */
+  .progress-card {
+    background: var(--white);
+    border-radius: var(--r);
+    padding: 16px 18px;
+    box-shadow: 0 1px 4px rgba(30,20,16,0.07);
+    animation: fadeUp 0.4s var(--ease);
+  }
+  .prog-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }
+  .prog-label { font-size: 0.78rem; font-weight: 500; color: var(--ink-60); }
+  .prog-pct { font-size: 0.78rem; font-weight: 600; color: var(--terracotta); }
+  .prog-track {
+    height: 5px; background: var(--parchment); border-radius: 99px; overflow: hidden;
+  }
+  .prog-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--terracotta) 0%, #d4956e 60%, var(--sage) 100%);
+    border-radius: 99px;
+    transition: width 0.7s var(--ease);
+    animation: progressFill 1s var(--ease);
+  }
+  .prog-msg {
+    font-family: var(--font-d);
+    font-style: italic;
+    font-size: 0.82rem;
+    color: var(--ink-60);
+    text-align: center;
+    margin-top: 9px;
+  }
+
+  /* ── Plan Items ── */
+  .section-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--ink-30);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+    padding-left: 2px;
+  }
+  .items-list { display: flex; flex-direction: column; gap: 7px; }
+
+  .plan-item {
+    background: var(--white);
+    border-radius: var(--r);
+    padding: 12px 14px 12px 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    box-shadow: 0 1px 3px rgba(30,20,16,0.07);
+    border: 1.5px solid transparent;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    animation: fadeUp 0.3s var(--ease);
+    cursor: default;
+    position: relative;
+  }
+  .plan-item:hover { border-color: var(--sand); box-shadow: 0 3px 12px rgba(30,20,16,0.09); }
+  .plan-item.is-done { background: #f9f6f1; }
+  .plan-item.is-dragging {
+    box-shadow: 0 10px 30px rgba(30,20,16,0.15);
+    border-color: var(--terracotta);
+    opacity: 0.85;
+  }
+
+  .drag-handle-btn {
+    color: var(--ink-30);
+    cursor: grab;
+    padding: 2px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .plan-item:hover .drag-handle-btn { opacity: 1; }
+  .drag-handle-btn:active { cursor: grabbing; }
+
+  .cb-btn {
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    border: 2px solid var(--sand);
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--white);
+    transition: all 0.2s;
+  }
+  .cb-btn:hover { border-color: var(--terracotta); }
+  .cb-btn.checked { background: var(--sage); border-color: var(--sage); }
+  .cb-btn.checked:hover { background: var(--forest); border-color: var(--forest); }
+
+  .item-body { flex: 1; min-width: 0; }
+  .item-title-text {
+    font-size: 0.9rem;
+    color: var(--ink);
+    word-break: break-word;
+    line-height: 1.4;
+  }
+  .plan-item.is-done .item-title-text {
+    text-decoration: line-through;
+    color: var(--ink-60);
+  }
+  .item-desc-text {
+    font-size: 0.775rem;
+    color: var(--ink-60);
+    margin-top: 3px;
+    line-height: 1.5;
+  }
+  .item-by {
+    font-size: 0.68rem;
+    color: var(--ink-30);
+    margin-top: 4px;
+  }
+
+  .item-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+  }
+  .plan-item:hover .item-actions { opacity: 1; }
+  .item-action-btn {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ink-30);
+    transition: background 0.2s, color 0.2s;
+  }
+  .item-action-btn:hover { background: var(--parchment); color: var(--ink); }
+  .item-action-btn.danger:hover { background: #fef0ee; color: #c04030; }
+
+  /* Edit form inside item */
+  .item-edit { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+  .item-edit-title {
+    border: 1.5px solid var(--terracotta);
+    border-radius: var(--rs);
+    padding: 7px 10px;
+    font-size: 0.9rem;
+    color: var(--ink);
+    background: var(--parchment);
+    width: 100%;
+    outline: none;
+  }
+  .item-edit-desc {
+    border: 1.5px solid var(--sand);
+    border-radius: var(--rs);
+    padding: 6px 10px;
+    font-size: 0.78rem;
+    color: var(--ink-60);
+    background: var(--parchment);
+    width: 100%;
+    outline: none;
+  }
+  .item-edit-actions { display: flex; gap: 6px; }
+  .btn-primary {
+    background: var(--terracotta);
+    color: white;
+    border-radius: 7px;
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: background 0.18s;
+  }
+  .btn-primary:hover { background: var(--rust); }
+  .btn-primary:disabled { opacity: 0.45; pointer-events: none; }
+  .btn-ghost {
+    background: var(--parchment);
+    color: var(--ink-60);
+    border-radius: 7px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    transition: background 0.18s;
+  }
+  .btn-ghost:hover { background: var(--sand); }
+
+  /* ── Add Form ── */
+  .add-trigger-btn {
+    width: 100%;
+    border: 1.5px dashed var(--sand);
+    border-radius: var(--r);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink-60);
+    font-size: 0.875rem;
+    background: rgba(255,255,255,0.5);
+    transition: all 0.2s;
+  }
+  .add-trigger-btn:hover { border-color: var(--terracotta); color: var(--terracotta); background: rgba(196,120,90,0.04); }
+  .add-trigger-icon { color: var(--terracotta); flex-shrink: 0; }
+  .add-form-card {
+    background: var(--white);
+    border: 1.5px solid var(--terracotta);
+    border-radius: var(--r);
+    padding: 16px;
+    box-shadow: 0 4px 20px rgba(196,120,90,0.12);
+    animation: scaleIn 0.22s var(--ease);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .add-form-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--terracotta);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 2px;
+  }
+  .add-input-title {
+    border: 1.5px solid var(--sand);
+    border-radius: var(--rs);
+    padding: 10px 13px;
+    font-size: 0.925rem;
+    color: var(--ink);
+    background: var(--parchment);
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .add-input-title:focus { border-color: var(--terracotta); }
+  .add-input-desc {
+    border: 1.5px solid var(--sand);
+    border-radius: var(--rs);
+    padding: 8px 13px;
+    font-size: 0.83rem;
+    color: var(--ink-60);
+    background: var(--parchment);
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .add-form-actions { display: flex; gap: 7px; }
+  .btn-add-submit {
+    flex: 1;
+    background: var(--terracotta);
+    color: white;
+    border-radius: var(--rs);
+    padding: 10px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background 0.18s, transform 0.15s;
+    letter-spacing: 0.02em;
+  }
+  .btn-add-submit:hover { background: var(--rust); }
+  .btn-add-submit:active { transform: scale(0.98); }
+  .btn-add-submit:disabled { opacity: 0.45; pointer-events: none; }
+
+  /* ── Empty ── */
+  .empty-wrap {
+    text-align: center;
+    padding: 44px 16px;
+    animation: fadeIn 0.5s ease;
+  }
+  .empty-icon { font-size: 3rem; margin-bottom: 14px; display: block; }
+  .empty-title {
+    font-family: var(--font-d);
+    font-size: 1.25rem;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .empty-sub {
+    font-family: var(--font-d);
+    font-style: italic;
+    font-size: 0.875rem;
+    color: var(--ink-60);
+    line-height: 1.6;
+  }
+
+  /* ── Done section ── */
+  .done-section { margin-top: 16px; }
+  .done-toggle-btn {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--sage);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+    padding-left: 2px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .done-toggle-btn:hover { color: var(--forest); }
+
+  /* ── Settings overlay ── */
+  .settings-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(30,20,16,0.45);
+    display: flex; align-items: flex-end; justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+  .settings-sheet {
+    width: 100%; max-width: 580px;
+    background: var(--white);
+    border-radius: 24px 24px 0 0;
+    padding: 28px 24px 36px;
+    animation: slideUp 0.3s var(--ease);
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .settings-title {
+    font-family: var(--font-d);
+    font-size: 1.3rem;
+    color: var(--ink);
+    margin-bottom: 20px;
+  }
+  .settings-field { margin-bottom: 14px; }
+  .settings-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--ink-60);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: block;
+    margin-bottom: 5px;
+  }
+  .settings-input {
+    width: 100%;
+    border: 1.5px solid var(--sand);
+    border-radius: var(--rs);
+    padding: 9px 12px;
+    font-size: 0.875rem;
+    color: var(--ink);
+    background: var(--parchment);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .settings-input:focus { border-color: var(--terracotta); }
+  .settings-save-btn {
+    width: 100%;
+    background: var(--terracotta);
+    color: white;
+    border-radius: var(--rs);
+    padding: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background 0.18s;
+    margin-top: 6px;
+  }
+  .settings-save-btn:hover { background: var(--rust); }
+
+  /* ── Main layout ── */
+  .main-wrap { max-width: 580px; margin: 0 auto; padding: 20px 16px 80px; }
+  .section { display: flex; flex-direction: column; gap: 7px; margin-bottom: 20px; }
+
+  @media (min-width: 580px) {
+    .main-wrap { padding: 24px 20px 80px; }
+    .header { border-radius: 0; }
+  }
+
+  .confetti-dot {
+    position: fixed;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: confettiFall 1.2s ease-in forwards;
+    z-index: 999;
+  }
+  @keyframes confettiFall {
+    from { opacity: 1; transform: translateY(0) rotate(0deg); }
+    to   { opacity: 0; transform: translateY(120px) rotate(360deg); }
+  }
+`;
+
+// ─── Confetti burst ───────────────────────────────────────────────
+function spawnConfetti(x, y) {
+  const colors = ["#c4785a","#7a9e8e","#e5d9c4","#f2c96a","#d4a5a5"];
+  for (let i = 0; i < 12; i++) {
+    const el = document.createElement("div");
+    el.className = "confetti-dot";
+    el.style.cssText = `
+      left: ${x + (Math.random()-0.5)*40}px;
+      top: ${y + (Math.random()-0.5)*20}px;
+      background: ${colors[Math.floor(Math.random()*colors.length)]};
+      animation-delay: ${Math.random()*0.15}s;
+    `;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1400);
+  }
+}
+
+// ─── Login Screen ─────────────────────────────────────────────────
+function LoginScreen({ users, onLogin }) {
+  const [selected, setSelected] = useState(null);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  const handleLogin = () => {
+    if (!selected) return;
+    if (password !== "nepal2025") {
+      setError("That's not quite right. Try: nepal2025");
+      return;
+    }
+    onLogin(selected);
+  };
+
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <span className="login-mountain">🏔️</span>
+        <h1 className="login-title">Our Nepal Plan</h1>
+        <p className="login-sub">A private space, just for the two of you.</p>
+
+        <span className="user-select-label">Who's logging in?</span>
+        <div className="user-buttons">
+          {users.map(u => (
+            <button
+              key={u.id}
+              className={`user-btn ${selected?.id === u.id ? "selected" : ""}`}
+              onClick={() => { setSelected(u); setError(""); }}
+            >
+              <span className="user-btn-emoji">{u.emoji}</span>
+              <span className="user-btn-name">{u.name}</span>
+            </button>
+          ))}
+        </div>
+
+        {selected && (
+          <div className="pw-field">
+            <label className="pw-label">Password</label>
+            <input
+              className="pw-input"
+              type="password"
+              value={password}
+              onChange={e => { setPassword(e.target.value); setError(""); }}
+              onKeyDown={e => e.key === "Enter" && handleLogin()}
+              placeholder="••••••••••"
+              autoFocus
+            />
+            <p className="pw-hint">Default password is: nepal2025</p>
+          </div>
+        )}
+
+        {error && <div className="login-error">{error}</div>}
+
+        <button
+          className="login-btn"
+          onClick={handleLogin}
+          disabled={!selected || !password}
+        >
+          Enter our space →
+        </button>
+        <div className="login-privacy">🔒 Private — only two people have access</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Progress Bar ─────────────────────────────────────────────────
+function ProgressBar({ items }) {
+  const total = items.length;
+  const done  = items.filter(i => i.done).length;
+  const pct   = total === 0 ? 0 : Math.round((done/total)*100);
+
+  const msgs = [
+    "Your adventure is a blank canvas ✨",
+    "The journey begins, one plan at a time…",
+    "You're mapping out something beautiful 🗺️",
+    "Nepal is getting closer with every tick 🏔️",
+    "Almost there — almost Nepal…",
+    "Every plan ticked. Every memory, yours. 🇳🇵❤️",
+  ];
+  const msgIdx = total === 0 ? 0 : Math.min(Math.floor(pct/20), 5);
+
+  return (
+    <div className="progress-card">
+      <div className="prog-row">
+        <span className="prog-label">{done} of {total} adventures planned</span>
+        <span className="prog-pct">{pct}%</span>
+      </div>
+      <div className="prog-track">
+        <div className="prog-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="prog-msg">{msgs[msgIdx]}</p>
+    </div>
+  );
+}
+
+// ─── Single Plan Item ─────────────────────────────────────────────
+function PlanItem({ item, users, onToggle, onUpdate, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(item.title);
+  const [desc,  setDesc]  = useState(item.description || "");
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  const addedBy = users.find(u => u.id === item.addedById);
+
+  const handleSave = () => {
+    if (!title.trim()) return;
+    onUpdate(item.id, { title: title.trim(), description: desc.trim() });
+    setEditing(false);
+  };
+
+  const handleDelete = () => {
+    if (!confirmDel) { setConfirmDel(true); setTimeout(() => setConfirmDel(false), 3000); return; }
+    onDelete(item.id);
+  };
+
+  const handleToggle = (e) => {
+    if (!item.done) spawnConfetti(e.clientX, e.clientY);
+    onToggle(item.id);
+  };
+
+  return (
+    <div className={`plan-item ${item.done ? "is-done" : ""}`}>
+      <button className="drag-handle-btn" title="Drag to reorder">
+        <DragIcon />
+      </button>
+
+      <button
+        className={`cb-btn ${item.done ? "checked" : ""}`}
+        onClick={handleToggle}
+        title={item.done ? "Mark undone" : "Mark done"}
+      >
+        {item.done && <CheckIcon />}
+      </button>
+
+      {editing ? (
+        <div className="item-edit">
+          <input
+            className="item-edit-title"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            autoFocus
+            onKeyDown={e => {
+              if (e.key === "Enter") handleSave();
+              if (e.key === "Escape") { setTitle(item.title); setDesc(item.description||""); setEditing(false); }
+            }}
+          />
+          <textarea
+            className="item-edit-desc"
+            value={desc}
+            onChange={e => setDesc(e.target.value)}
+            rows={2}
+            placeholder="Notes… (optional)"
+          />
+          <div className="item-edit-actions">
+            <button className="btn-primary" onClick={handleSave} disabled={!title.trim()}>Save</button>
+            <button className="btn-ghost" onClick={() => { setTitle(item.title); setDesc(item.description||""); setEditing(false); }}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div className="item-body" onDoubleClick={() => setEditing(true)}>
+          <p className="item-title-text">{item.title}</p>
+          {item.description && <p className="item-desc-text">{item.description}</p>}
+          {addedBy && <p className="item-by">Added by {addedBy.name}</p>}
+        </div>
+      )}
+
+      {!editing && (
+        <div className="item-actions">
+          <button className="item-action-btn" onClick={() => setEditing(true)} title="Edit"><EditIcon /></button>
+          <button
+            className={`item-action-btn danger`}
+            onClick={handleDelete}
+            title={confirmDel ? "Tap again to confirm" : "Delete"}
+            style={confirmDel ? { background:"#fef0ee", color:"#c04030", opacity:1 } : {}}
+          >
+            {confirmDel ? "✓" : <TrashIcon />}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Add Item Form ────────────────────────────────────────────────
+function AddForm({ currentUser, onAdd }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [desc, setDesc]   = useState("");
+
+  const handleSubmit = () => {
+    if (!title.trim()) return;
+    onAdd({ title: title.trim(), description: desc.trim(), addedById: currentUser.id });
+    setTitle(""); setDesc(""); setOpen(false);
+  };
+
+  if (!open) return (
+    <button className="add-trigger-btn" onClick={() => setOpen(true)}>
+      <span className="add-trigger-icon"><PlusIcon /></span>
+      Add something to our list…
+    </button>
+  );
+
+  return (
+    <div className="add-form-card">
+      <p className="add-form-title">New plan item</p>
+      <input
+        className="add-input-title"
+        value={title}
+        onChange={e => setTitle(e.target.value)}
+        placeholder="What do you want to do together?"
+        autoFocus
+        onKeyDown={e => {
+          if (e.key === "Enter") handleSubmit();
+          if (e.key === "Escape") { setTitle(""); setDesc(""); setOpen(false); }
+        }}
+      />
+      <textarea
+        className="add-input-desc"
+        value={desc}
+        onChange={e => setDesc(e.target.value)}
+        rows={2}
+        placeholder="Any notes? (totally optional)"
+      />
+      <div className="add-form-actions">
+        <button className="btn-add-submit" onClick={handleSubmit} disabled={!title.trim()}>
+          Add to our plan ✨
+        </button>
+        <button className="btn-ghost" onClick={() => { setTitle(""); setDesc(""); setOpen(false); }}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Settings Sheet ───────────────────────────────────────────────
+function SettingsSheet({ users, onSave, onClose }) {
+  const [u1name, setU1name] = useState(users[0].name);
+  const [u2name, setU2name] = useState(users[1].name);
+  const [tagline, setTagline] = useState(
+    localStorage.getItem("nepal_tagline") || "Counting days together…"
+  );
+
+  const handleSave = () => {
+    const updated = [
+      { ...users[0], name: u1name.trim() || users[0].name },
+      { ...users[1], name: u2name.trim() || users[1].name },
+    ];
+    localStorage.setItem("nepal_tagline", tagline);
+    onSave(updated);
+    onClose();
+  };
+
+  return (
+    <div className="settings-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="settings-sheet">
+        <h2 className="settings-title">Personalise ✏️</h2>
+
+        <div className="settings-field">
+          <label className="settings-label">Person 1 name {users[0].emoji}</label>
+          <input className="settings-input" value={u1name} onChange={e => setU1name(e.target.value)} />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Person 2 name {users[1].emoji}</label>
+          <input className="settings-input" value={u2name} onChange={e => setU2name(e.target.value)} />
+        </div>
+        <div className="settings-field">
+          <label className="settings-label">Tagline</label>
+          <input className="settings-input" value={tagline} onChange={e => setTagline(e.target.value)} />
+        </div>
+
+        <button className="settings-save-btn" onClick={handleSave}>Save changes</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ─────────────────────────────────────────────────────
+export default function App() {
+  const [users, setUsers]         = useState(loadUsers);
+  const [session, setSession]     = useState(loadSession);
+  const [items, setItems]         = useState(loadData);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showDone, setShowDone]   = useState(true);
+  const [tagline, setTagline]     = useState(
+    () => localStorage.getItem("nepal_tagline") || "Counting days together…"
+  );
+
+  // Persist items whenever they change
+  useEffect(() => { saveData(items); }, [items]);
+
+  // Refresh tagline when settings change
+  useEffect(() => {
+    const t = localStorage.getItem("nepal_tagline") || "Counting days together…";
+    setTagline(t);
+  }, [showSettings]);
+
+  const currentUser = session ? users.find(u => u.id === session) : null;
+  const partnerUser = session ? users.find(u => u.id !== session) : null;
+
+  const handleLogin = (user) => {
+    setSession(user.id);
+    saveSession(user.id);
+  };
+
+  const handleLogout = () => {
+    setSession(null);
+    clearSession();
+  };
+
+  const addItem = (data) => {
+    const newItem = {
+      id: `item_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+      order: Date.now(),
+      done: false,
+      createdAt: Date.now(),
+      ...data,
+    };
+    setItems(prev => [...prev, newItem]);
+  };
+
+  const updateItem = (id, data) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, ...data } : i));
+  };
+
+  const toggleItem = (id) => {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, done: !i.done } : i));
+  };
+
+  const deleteItem = (id) => {
+    setItems(prev => prev.filter(i => i.id !== id));
+  };
+
+  // Simple drag-and-drop (touch + mouse)
+  const dragItem = useRef(null);
+  const dragOverItem = useRef(null);
+
+  const handleDragStart = (idx) => { dragItem.current = idx; };
+  const handleDragEnter = (idx) => { dragOverItem.current = idx; };
+  const handleDragEnd   = () => {
+    if (dragItem.current === null || dragOverItem.current === null) return;
+    const pending = items.filter(i => !i.done);
+    const done    = items.filter(i =>  i.done);
+    const reordered = [...pending];
+    const dragged = reordered.splice(dragItem.current, 1)[0];
+    reordered.splice(dragOverItem.current, 0, dragged);
+    setItems([...reordered, ...done]);
+    dragItem.current = null;
+    dragOverItem.current = null;
+  };
+
+  const saveSettings = (updatedUsers) => {
+    setUsers(updatedUsers);
+    saveUsers(updatedUsers);
+    setTagline(localStorage.getItem("nepal_tagline") || "Counting days together…");
+  };
+
+  if (!currentUser) {
+    return (
+      <>
+        <style>{globalStyles}</style>
+        <LoginScreen users={users} onLogin={handleLogin} />
+      </>
+    );
+  }
+
+  const pending = items.filter(i => !i.done);
+  const done    = items.filter(i =>  i.done);
+
+  return (
+    <>
+      <style>{globalStyles}</style>
+      <div className="app-wrap">
+
+        {/* Header */}
+        <header className="header">
+          <div className="header-inner">
+            <div className="header-row1">
+              <div className="avatars-row">
+                <div className="av" style={{ background: currentUser.color + "28", color: currentUser.color }}>
+                  {currentUser.name[0].toUpperCase()}
+                </div>
+                <span className="av-heart">♥</span>
+                <div className="av" style={{ background: (partnerUser?.color || "#7a9e8e") + "28", color: partnerUser?.color || "#7a9e8e" }}>
+                  {(partnerUser?.name || "?")[0].toUpperCase()}
+                </div>
+              </div>
+              <div className="header-actions">
+                <button className="header-btn" onClick={() => setShowSettings(true)} title="Settings">⚙️</button>
+                <button className="header-btn" onClick={handleLogout} title="Sign out">↩</button>
+              </div>
+            </div>
+            <div className="header-title-row">
+              <h1 className="header-title">Our Nepal Plan</h1>
+              <span className="header-flag">🇳🇵</span>
+            </div>
+            <p className="header-tagline">{tagline}</p>
+            <p className="header-who">{currentUser.name} &amp; {partnerUser?.name || "Your person"}</p>
+          </div>
+        </header>
+
+        {/* Main */}
+        <main className="main-wrap">
+
+          {/* Progress */}
+          <div style={{ marginBottom: 20 }}>
+            <ProgressBar items={items} />
+          </div>
+
+          {/* Pending items */}
+          <div className="section">
+            {pending.length > 0 && (
+              <p className="section-label">To do — {pending.length} adventure{pending.length !== 1 ? "s" : ""}</p>
+            )}
+            <div className="items-list">
+              {pending.map((item, idx) => (
+                <div
+                  key={item.id}
+                  draggable
+                  onDragStart={() => handleDragStart(idx)}
+                  onDragEnter={() => handleDragEnter(idx)}
+                  onDragEnd={handleDragEnd}
+                  onDragOver={e => e.preventDefault()}
+                >
+                  <PlanItem
+                    item={item}
+                    users={users}
+                    onToggle={toggleItem}
+                    onUpdate={updateItem}
+                    onDelete={deleteItem}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {items.length === 0 && (
+              <div className="empty-wrap">
+                <span className="empty-icon">🗺️</span>
+                <p className="empty-title">Your Nepal canvas is empty</p>
+                <p className="empty-sub">Start adding things you want to see,<br />taste, trek, and experience together.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Add form */}
+          <AddForm currentUser={currentUser} onAdd={addItem} />
+
+          {/* Done section */}
+          {done.length > 0 && (
+            <div className="done-section">
+              <button
+                className="done-toggle-btn"
+                onClick={() => setShowDone(v => !v)}
+              >
+                {showDone ? "▾" : "▸"} Memories made ({done.length})
+              </button>
+              {showDone && (
+                <div className="items-list">
+                  {done.map(item => (
+                    <PlanItem
+                      key={item.id}
+                      item={item}
+                      users={users}
+                      onToggle={toggleItem}
+                      onUpdate={updateItem}
+                      onDelete={deleteItem}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </main>
+
+        {/* Settings sheet */}
+        {showSettings && (
+          <SettingsSheet
+            users={users}
+            onSave={saveSettings}
+            onClose={() => setShowSettings(false)}
+          />
+        )}
+      </div>
+    </>
+  );
+}
